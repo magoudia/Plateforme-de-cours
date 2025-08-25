@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Search, Filter } from 'lucide-react';
-import { getAllCourses } from '../services/adminCourses';
+import { getAllCourses, getAllCoursesAsync } from '../services/adminCourses';
 import CourseCard from '../components/Course/CourseCard';
 import { Course } from '../types';
 
@@ -12,9 +12,15 @@ const CourseCatalog: React.FC = () => {
 
   const [courses, setCourses] = useState<Course[]>(getAllCourses());
   useEffect(() => {
-    const onStorage = () => setCourses(getAllCourses());
+    let mounted = true;
+    const load = async () => {
+      const list = await getAllCoursesAsync();
+      if (mounted) setCourses(list);
+    };
+    load();
+    const onStorage = () => load();
     window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
+    return () => { mounted = false; window.removeEventListener('storage', onStorage); };
   }, []);
 
   const categories = [...new Set(courses.map(course => course.category))];

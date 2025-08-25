@@ -1,5 +1,6 @@
 import { Course } from '../types';
 import { mockCourses } from '../data/mockData';
+import { supabase, hasSupabase } from '../lib/supabaseClient';
 
 const STORAGE_KEY = 'customCourses';
 const STORAGE_DELETED_KEY = 'deletedCourseIds';
@@ -50,6 +51,58 @@ export function getAllCourses(): Course[] {
   const deleted = new Set(readDeleted());
   // Merge base + overrides, then filter out deleted ids
   return mergeCourses(mockCourses, custom).filter(c => !deleted.has(c.id));
+}
+
+// --- Supabase helpers (async) ---
+
+export async function getAllCoursesAsync(): Promise<Course[]> {
+  try {
+    if (hasSupabase && supabase) {
+      const { data, error } = await supabase
+        .from('courses')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      const dbCourses = Array.isArray(data) ? (data as unknown as Course[]) : [];
+      // Merge mock base with DB, still respect local deleted tombstones if any
+      const deleted = new Set(readDeleted());
+      return mergeCourses(mockCourses, dbCourses).filter(c => !deleted.has(c.id));
+    }
+  } catch (e) {
+    console.warn('Supabase getAllCoursesAsync failed, fallback to local:', e);
+  }
+  return getAllCourses();
+}
+
+export async function saveCourseAsync(course: Course): Promise<void> {
+  // Always keep local fallback updated for offline/dev
+  saveCourse(course);
+  if (hasSupabase && supabase) {
+    try {
+      const { error } = await supabase
+        .from('courses')
+        .upsert(course, { onConflict: 'id' });
+      if (error) throw error;
+    } catch (e) {
+      console.warn('Supabase saveCourseAsync failed, kept local copy:', e);
+    }
+  }
+}
+
+export async function deleteCourseAsync(courseId: string): Promise<void> {
+  // Keep local tombstone behavior
+  deleteCourse(courseId);
+  if (hasSupabase && supabase) {
+    try {
+      const { error } = await supabase
+        .from('courses')
+        .delete()
+        .eq('id', courseId);
+      if (error) throw error;
+    } catch (e) {
+      console.warn('Supabase deleteCourseAsync failed, local tombstone remains:', e);
+    }
+  }
 }
 
 export function saveCourse(course: Course): void {

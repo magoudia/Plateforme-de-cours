@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { BookOpen, Clock, Award, TrendingUp, Play, CheckCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useEffect, useState } from 'react';
-import { getAllCourses } from '../services/adminCourses';
+import { getAllCourses, getAllCoursesAsync } from '../services/adminCourses';
 import { useNotification } from '../contexts/NotificationContext';
 import { useProgress } from '../contexts/ProgressContext';
 import { Course } from '../types';
@@ -25,9 +25,15 @@ const Dashboard: React.FC = () => {
   const [courses, setCourses] = useState<Course[]>(getAllCourses());
 
   useEffect(() => {
-    const onStorage = () => setCourses(getAllCourses());
+    let mounted = true;
+    const load = async () => {
+      const list = await getAllCoursesAsync();
+      if (mounted) setCourses(list);
+    };
+    load();
+    const onStorage = () => load();
     window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
+    return () => { mounted = false; window.removeEventListener('storage', onStorage); };
   }, []);
 
   // Fusionne les cours inscrits du user et du localStorage (évite les doublons)

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Course } from '../../types';
-import { getAllCourses, newCourseTemplate, saveCourse, deleteCourse } from '../../services/adminCourses';
+import { getAllCourses, getAllCoursesAsync, newCourseTemplate, saveCourse, saveCourseAsync, deleteCourse, deleteCourseAsync } from '../../services/adminCourses';
 import { useNotification } from '../../contexts/NotificationContext';
 
 const levels: Course['level'][] = ['Débutant', 'Intermédiaire', 'Avancé'];
@@ -17,7 +17,10 @@ const AdminCourses: React.FC = () => {
 
   const selectedBase = useMemo(() => courses.find(c => c.id === selectedId) || null, [courses, selectedId]);
 
-  const reload = () => setCourses(getAllCourses());
+  const reload = async () => {
+    const list = await getAllCoursesAsync();
+    setCourses(list);
+  };
 
   useEffect(() => {
     reload();
@@ -79,7 +82,7 @@ const AdminCourses: React.FC = () => {
     setSelectedId(c.id);
   };
 
-  const onSave = () => {
+  const onSave = async () => {
     if (!draft) return;
     const valid = (draft.title || '').trim().length > 0 && (draft.category || '').trim().length > 0;
     if (!valid) {
@@ -97,8 +100,8 @@ const AdminCourses: React.FC = () => {
       const flatLessons = (draft.modules || []).flatMap(m => m.lessons || []);
       const totalLessons = flatLessons.length;
       // Important: also persist the flat lessons array for components relying on course.lessons
-      saveCourse({ ...draft, lessons: flatLessons, totalModules, totalLessons });
-      reload();
+      await saveCourseAsync({ ...draft, lessons: flatLessons, totalModules, totalLessons });
+      await reload();
       addNotification({
         type: 'success',
         title: 'Cours enregistré',
@@ -115,14 +118,14 @@ const AdminCourses: React.FC = () => {
     }
   };
 
-  const onDelete = () => {
+  const onDelete = async () => {
     if (!selectedId) return;
     const ok = window.confirm('Supprimer ce cours ? Cette action est irréversible.');
     if (!ok) return;
-    deleteCourse(selectedId);
+    await deleteCourseAsync(selectedId);
     setSelectedId(null);
     setDraft(null);
-    reload();
+    await reload();
     addNotification({
       type: 'info',
       title: 'Cours supprimé',
