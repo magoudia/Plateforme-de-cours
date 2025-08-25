@@ -377,7 +377,7 @@ const Dashboard: React.FC = () => {
                       <p className="text-sm text-gray-600">{course.category}</p>
                       <div className="flex items-center mt-1">
                         <span className="text-sm text-blue-600 font-medium">
-                          X CFA
+                          {course.price.toLocaleString('fr-FR')} CFA
                         </span>
                         <span className="mx-2 text-gray-300">•</span>
                         <span className="text-sm text-gray-500">{course.level}</span>

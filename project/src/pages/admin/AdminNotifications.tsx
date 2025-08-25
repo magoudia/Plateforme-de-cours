@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNotification } from '../../contexts/NotificationContext';
+import { supabase, hasSupabase } from '../../lib/supabaseClient';
 
 const AdminNotifications: React.FC = () => {
   const { notifications, addNotification, markAsRead, deleteNotification, markAllAsRead } = useNotification();
@@ -27,28 +28,52 @@ const AdminNotifications: React.FC = () => {
     return opts;
   }, [users]);
 
-  const onSend = (e: React.FormEvent) => {
+  const onSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !message.trim()) return;
     const payload = { type, title: title.trim(), message: message.trim() } as const;
     if (recipient === 'all') {
-      // broadcast via context
-      addNotification(payload);
+      // Try Supabase broadcast first
+      if (hasSupabase && supabase) {
+        const { error } = await supabase.from('notifications').insert({
+          type: payload.type,
+          title: payload.title,
+          message: payload.message,
+        });
+        if (error) {
+          // fallback to local
+          addNotification(payload);
+        }
+      } else {
+        // fallback to local
+        addNotification(payload);
+      }
       setJustSent('Notification envoyée à tous les utilisateurs.');
     } else {
       // targeted to user-specific bucket
       try {
-        const key = `notifications:${recipient}`;
-        const raw = localStorage.getItem(key);
-        const arr = raw ? JSON.parse(raw) : [];
-        const newNotif = {
-          ...payload,
-          id: Math.random().toString(36).slice(2),
-          date: new Date().toISOString(),
-          read: false,
-        };
-        const next = Array.isArray(arr) ? [newNotif, ...arr] : [newNotif];
-        localStorage.setItem(key, JSON.stringify(next));
+        if (hasSupabase && supabase) {
+          const { error } = await supabase.from('user_notifications').insert({
+            recipient_id: recipient,
+            type: payload.type,
+            title: payload.title,
+            message: payload.message,
+            read: false,
+          });
+          if (error) throw error;
+        } else {
+          const key = `notifications:${recipient}`;
+          const raw = localStorage.getItem(key);
+          const arr = raw ? JSON.parse(raw) : [];
+          const newNotif = {
+            ...payload,
+            id: Math.random().toString(36).slice(2),
+            date: new Date().toISOString(),
+            read: false,
+          };
+          const next = Array.isArray(arr) ? [newNotif, ...arr] : [newNotif];
+          localStorage.setItem(key, JSON.stringify(next));
+        }
         // notify listening UIs
         window.dispatchEvent(new Event('notifications:updated'));
         window.dispatchEvent(new Event(`notifications:updated:${recipient}`));

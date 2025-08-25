@@ -69,7 +69,7 @@ const CourseCard: React.FC<CourseCardProps> = ({ course }) => {
         
         <div className="flex items-center justify-end">
           <div className="text-xl font-bold text-blue-600">
-            X CFA
+            {course.price.toLocaleString('fr-FR')} CFA
           </div>
         </div>
         

@@ -3,11 +3,12 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import AdminDashboard from './AdminDashboard';
 import AdminCourses from './AdminCourses';
+import AdminNotifications from './AdminNotifications';
 
 const AdminConsole: React.FC = () => {
   const { user, login, logout } = useAuth();
   const { addNotification } = useNotification();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'courses'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'courses' | 'notifications'>('dashboard');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const isAdmin = !!user?.isAdmin;
@@ -64,6 +65,12 @@ const AdminConsole: React.FC = () => {
                   onClick={() => setActiveTab('courses')}
                 >
                   Gestion des cours
+                </button>
+                <button
+                  className={`px-4 py-2 text-sm rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 active:scale-95 ${activeTab==='notifications' ? 'bg-white shadow text-indigo-700' : 'text-gray-600 hover:text-indigo-700'}`}
+                  onClick={() => setActiveTab('notifications')}
+                >
+                  Notifications
                 </button>
               </div>
             </div>
@@ -125,8 +132,10 @@ const AdminConsole: React.FC = () => {
         <div className="bg-white border rounded-2xl shadow-sm p-4">
           {activeTab === 'dashboard' ? (
             <AdminDashboard />
-          ) : (
+          ) : activeTab === 'courses' ? (
             <AdminCourses />
+          ) : (
+            <AdminNotifications />
           )}
         </div>
       </div>

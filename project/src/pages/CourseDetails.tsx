@@ -6,6 +6,10 @@ import { useAuth } from '../contexts/AuthContext';
 import { useProgress } from '../contexts/ProgressContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { Course } from '../types';
+import waveLogo from '../assets/wave.jpeg';
+import orangeLogo from '../assets/orange(2).jpeg';
+import visaLogo from '../assets/visa.jpeg';
+import mixbyyasLogo from '../assets/mixbyyas.jpeg';
 
 const CourseDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -31,6 +35,10 @@ const CourseDetails: React.FC = () => {
   const totalLessons = course?.lessons.length || 0;
   const isCourseCompleted = totalLessons > 0 && completedCount >= totalLessons;
   
+  // Montant formaté & téléphone officiel de paiement
+  const formattedPrice = `${Number(course?.price || 0).toLocaleString('fr-FR')} CFA`;
+  const PAYMENT_PHONE = '783079445'; // Remplace par ton numéro officiel si besoin
+
   if (!course) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -148,39 +156,60 @@ const CourseDetails: React.FC = () => {
 
   // Validation simple
   const isStep2Valid = form.name.trim() && form.email.trim();
-  const isStep3Valid = paymentMethod === 'card' ? form.card.trim() : form.phone.trim();
+  // Validation stricte numéro SN (Orange/Wave/Mixbyyas): 70/75/76/77/78 + 7 chiffres
+  const normalizePhone = (p: string) => p.replace(/\D/g, '');
+  const snPhoneRegex = /^(70|75|76|77|78)\d{7}$/;
+  const isPhoneValid = () => {
+    if (paymentMethod === 'card') return true;
+    const digits = normalizePhone(form.phone);
+    return snPhoneRegex.test(digits);
+  };
+  const isStep3Valid = paymentMethod === 'card' ? Boolean(form.card.trim()) : isPhoneValid();
 
   // Fonction pour vérifier si on doit passer aux instructions de paiement
   const shouldShowPaymentInstructions = () => {
-    return (paymentMethod === 'wave' || paymentMethod === 'orange') && form.phone.trim().length >= 8;
+    return (paymentMethod === 'wave' || paymentMethod === 'orange' || paymentMethod === 'mixbyyas') && isPhoneValid();
   };
 
   // Fonction pour obtenir les instructions de paiement
   const getPaymentInstructions = () => {
-    const amountLabel = 'X CFA';
+    const amountNumber = Number(course.price || 0);
+    const amountLabel = `${amountNumber.toLocaleString('fr-FR')} CFA`;
     if (paymentMethod === 'wave') {
       return {
         title: 'Paiement Wave',
         instructions: [
-          `Envoyez ${amountLabel} au numéro : 783079445`,
+          `Envoyez ${amountLabel} au numéro : ${PAYMENT_PHONE}`,
           'Ou scannez le QR code Wave ci-dessous',
           'Attendez la confirmation de paiement',
           'Cliquez sur "J\'ai payé" une fois le paiement effectué'
         ],
         // Placeholder sans montant numérique
-        qrCode: 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=wave://pay?phone=783079445&amount=X'
+        qrCode: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=wave://pay?phone=${PAYMENT_PHONE}&amount=${amountNumber}`
       };
     } else if (paymentMethod === 'orange') {
       return {
         title: 'Paiement Orange Money',
         instructions: [
-          `Envoyez ${amountLabel} au numéro : 783079445`,
-          'Ou utilisez le code USSD : #150*1*783079445*X#',
+          `Envoyez ${amountLabel} au numéro : ${PAYMENT_PHONE}`,
+          `Ou utilisez le code USSD : #150*1*${PAYMENT_PHONE}*${amountNumber}#`,
           'Attendez la confirmation de paiement',
           'Cliquez sur "J\'ai payé" une fois le paiement effectué'
         ],
         // Placeholder sans montant numérique
-        qrCode: 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=orange://pay?phone=783079445&amount=X'
+        qrCode: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=orange://pay?phone=${PAYMENT_PHONE}&amount=${amountNumber}`
+      };
+    } else if (paymentMethod === 'mixbyyas') {
+      return {
+        title: 'Paiement Mixbyyas',
+        instructions: [
+          `Envoyez ${amountLabel} via Mixbyyas au numéro : ${PAYMENT_PHONE}`,
+          'Indiquez en référence votre email d\'inscription',
+          'Attendez la confirmation de paiement',
+          'Cliquez sur "J\'ai payé" une fois le paiement effectué'
+        ],
+        // Placeholder sans montant numérique
+        qrCode: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=mixbyyas://pay?phone=${PAYMENT_PHONE}&amount=${amountNumber}`
       };
     }
     return null;
@@ -401,7 +430,7 @@ const CourseDetails: React.FC = () => {
             <div className="bg-white rounded-lg shadow-sm p-6 sticky top-8">
               <div className="text-center mb-6">
                 <div className="text-2xl font-bold text-blue-600 mb-2">
-                  X CFA
+                  {course.price > 0 ? formattedPrice : 'Gratuit'}
                 </div>
                 <p className="text-gray-600 text-sm">Prix fixe</p>
               </div>
@@ -431,14 +460,14 @@ const CourseDetails: React.FC = () => {
                       onClick={() => setShowPaymentModal(true)}
                       className="w-full bg-iai-bordeaux text-white py-3 px-4 rounded-lg hover:bg-iai-blue transition-colors font-medium"
                     >
-                      Payer X CFA et s'inscrire
+                      Payer {formattedPrice} et s'inscrire
                     </button>
                 ) : (
                   <button
                     onClick={() => setShowPaymentModal(true)}
                       className="w-full bg-iai-blue text-white py-3 px-4 rounded-lg hover:bg-iai-bordeaux transition-colors font-medium"
                   >
-                      Payer X CFA et s'inscrire
+                      Payer {formattedPrice} et s'inscrire
                   </button>
                   )
                 )
@@ -498,7 +527,7 @@ const CourseDetails: React.FC = () => {
             <h2 className="text-xl font-bold mb-4">Inscription et paiement</h2>
             <div className="mb-2 font-semibold">{course.title}</div>
             <div className="mb-2 text-sm text-gray-600">Catégorie : {course.category}</div>
-            <div className="mb-2 text-sm text-gray-600">Prix : <span className="font-bold">X CFA</span></div>
+            <div className="mb-2 text-sm text-gray-600">Prix : <span className="font-bold">{formattedPrice}</span></div>
             <div className="mb-4 text-gray-600 text-sm">{course.description.slice(0, 100)}...</div>
             <button onClick={() => setStep(2)} className="bg-iai-blue text-white px-6 py-2 rounded-lg font-semibold hover:bg-iai-bordeaux transition-colors w-full">Suivant</button>
           </div>
@@ -538,6 +567,30 @@ const CourseDetails: React.FC = () => {
             setStep(4);
           }}>
             <h2 className="text-xl font-bold mb-4">Informations supplémentaires</h2>
+
+            {/* Sélection du moyen de paiement */}
+            <div className="mb-5">
+              <label className="block mb-2 font-medium">Choisissez votre moyen de paiement</label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  { key: 'orange', label: 'Orange Money', img: orangeLogo },
+                  { key: 'wave', label: 'Wave', img: waveLogo },
+                  { key: 'card', label: 'Carte bancaire', img: visaLogo },
+                  { key: 'mixbyyas', label: 'Mixbyyas', img: mixbyyasLogo },
+                ].map((opt) => (
+                  <button
+                    type="button"
+                    key={opt.key}
+                    onClick={() => setPaymentMethod(opt.key)}
+                    className={`border rounded-lg p-3 flex flex-col items-center justify-center hover:shadow transition ${paymentMethod === opt.key ? 'ring-2 ring-iai-blue border-iai-blue' : ''}`}
+                    aria-pressed={paymentMethod === opt.key}
+                  >
+                    <img src={opt.img} alt={opt.label} className="h-10 w-auto object-contain mb-2" />
+                    <span className="text-sm font-medium text-gray-800 text-center">{opt.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="mb-4">
               <label className="block mb-2 font-medium">Quel est votre niveau actuel dans ce domaine ?</label>
               <select 
@@ -588,6 +641,9 @@ const CourseDetails: React.FC = () => {
                 {shouldShowPaymentInstructions() && (
                   <p className="text-sm text-green-600 mt-1">✓ Numéro valide - Vous serez redirigé vers les instructions de paiement</p>
                 )}
+                {!isPhoneValid() && form.phone && (
+                  <p className="text-sm text-red-600 mt-1">Numéro invalide. Format SN: 70/75/76/77/78 + 7 chiffres.</p>
+                )}
               </div>
             )}
             {paymentMethod === 'card' && (
@@ -617,7 +673,7 @@ const CourseDetails: React.FC = () => {
           </form>
         )}
         {/* Étape 4 : Instructions de paiement mobile */}
-        {step === 4 && (paymentMethod === 'wave' || paymentMethod === 'orange') && (
+        {step === 4 && (paymentMethod === 'wave' || paymentMethod === 'orange' || paymentMethod === 'mixbyyas') && (
           <div>
             <h2 className="text-xl font-bold mb-4 text-center">{getPaymentInstructions()?.title}</h2>
             
@@ -680,12 +736,17 @@ const CourseDetails: React.FC = () => {
             <h2 className="text-xl font-bold mb-4">Récapitulatif</h2>
             <div className="mb-2"><span className="font-medium">Nom :</span> {form.name}</div>
             <div className="mb-2"><span className="font-medium">Email :</span> {form.email}</div>
-            <div className="mb-2"><span className="font-medium">Paiement :</span> {paymentMethod === 'card' ? 'Carte bancaire' : paymentMethod === 'wave' ? 'Wave' : 'Orange Money'}</div>
+            <div className="mb-2"><span className="font-medium">Paiement :</span> {
+              paymentMethod === 'card' ? 'Carte bancaire' :
+              paymentMethod === 'wave' ? 'Wave' :
+              paymentMethod === 'orange' ? 'Orange Money' :
+              'Mixbyyas'
+            }</div>
             {paymentMethod !== 'card' && <div className="mb-2"><span className="font-medium">Téléphone :</span> {form.phone}</div>}
             {paymentMethod === 'card' && <div className="mb-2"><span className="font-medium">Carte :</span> **** **** **** {form.card.slice(-4)}</div>}
-            <div className="mb-4"><span className="font-medium">Montant :</span> <span className="font-bold">X CFA</span></div>
+            <div className="mb-4"><span className="font-medium">Montant :</span> <span className="font-bold">{formattedPrice}</span></div>
             
-            {(paymentMethod === 'wave' || paymentMethod === 'orange') && (
+            {(paymentMethod === 'wave' || paymentMethod === 'orange' || paymentMethod === 'mixbyyas') && (
               <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
                 <div className="flex items-center text-green-800">
                   <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
@@ -705,7 +766,7 @@ const CourseDetails: React.FC = () => {
       </div>
             
             {/* Boutons fixes en bas pour l'étape 4 */}
-            {step === 4 && (paymentMethod === 'wave' || paymentMethod === 'orange') && (
+            {step === 4 && (paymentMethod === 'wave' || paymentMethod === 'orange' || paymentMethod === 'mixbyyas') && (
               <div className="p-6 pt-4 border-t border-gray-200">
                 <div className="flex gap-3">
                   <button 
