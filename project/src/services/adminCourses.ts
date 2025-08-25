@@ -64,9 +64,10 @@ export async function getAllCoursesAsync(): Promise<Course[]> {
         .order('created_at', { ascending: false });
       if (error) throw error;
       const dbCourses = Array.isArray(data) ? (data as unknown as Course[]) : [];
-      // Merge mock base with DB, still respect local deleted tombstones if any
+      // Merge mock base with DB and also include local custom overrides to avoid UI flicker
+      const custom = readStore();
       const deleted = new Set(readDeleted());
-      return mergeCourses(mockCourses, dbCourses).filter(c => !deleted.has(c.id));
+      return mergeCourses(mergeCourses(mockCourses, dbCourses), custom).filter(c => !deleted.has(c.id));
     }
   } catch (e) {
     console.warn('Supabase getAllCoursesAsync failed, fallback to local:', e);
@@ -135,7 +136,7 @@ export function newCourseTemplate(partial?: Partial<Course>): Course {
     duration: '0min',
     level: 'Débutant',
     category: 'Général',
-    price: 0,
+    price: 60000,
     rating: 0,
     studentsCount: 0,
     imageUrl: 'https://placehold.co/400x250?text=Cours',

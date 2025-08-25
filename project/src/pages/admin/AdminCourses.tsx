@@ -193,6 +193,17 @@ const AdminCourses: React.FC = () => {
                   )}
                 </div>
                 <div>
+                  <label className="block text-sm font-medium text-gray-700">Prix (CFA)</label>
+                  <input
+                    type="number"
+                    className="mt-1 w-full rounded border-gray-300"
+                    min={0}
+                    step={100}
+                    value={typeof draft.price === 'number' ? draft.price : 0}
+                    onChange={(e) => setDraft({ ...draft, price: Number(e.target.value || 0) })}
+                  />
+                </div>
+                <div>
                   <label className="block text-sm font-medium text-gray-700">Image (URL)</label>
                   <div className="mt-1 flex gap-2">
                     <input
