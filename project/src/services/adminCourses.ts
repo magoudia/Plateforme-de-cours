@@ -138,7 +138,7 @@ export function newCourseTemplate(partial?: Partial<Course>): Course {
     price: 0,
     rating: 0,
     studentsCount: 0,
-    imageUrl: 'https://via.placeholder.com/400x250?text=Cours',
+    imageUrl: 'https://placehold.co/400x250?text=Cours',
     isPremium: false,
     lessons: [],
     modules: [],

@@ -205,7 +205,7 @@ const AdminCourses: React.FC = () => {
                       type="button"
                       className="px-2 py-2 rounded border text-sm hover:bg-gray-50"
                       title="Réinitialiser l'image par défaut"
-                      onClick={() => setDraft({ ...draft, imageUrl: 'https://via.placeholder.com/400x250?text=Cours' })}
+                      onClick={() => setDraft({ ...draft, imageUrl: 'https://placehold.co/400x250?text=Cours' })}
                     >Par défaut</button>
                   </div>
                   <div className="mt-2">
@@ -248,7 +248,7 @@ const AdminCourses: React.FC = () => {
                       src={draft.imageUrl}
                       alt="Aperçu du cours"
                       className="mt-2 h-24 w-full object-cover rounded border"
-                      onError={(e)=>{ (e.currentTarget as HTMLImageElement).src = 'https://via.placeholder.com/400x250?text=Cours'; }}
+                      onError={(e)=>{ (e.currentTarget as HTMLImageElement).src = 'https://placehold.co/400x250?text=Cours'; }}
                     />
                   )}
                 </div>
