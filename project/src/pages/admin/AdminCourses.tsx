@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Course } from '../../types';
 import { getAllCourses, getAllCoursesAsync, newCourseTemplate, saveCourse, saveCourseAsync, deleteCourse, deleteCourseAsync } from '../../services/adminCourses';
 import { useNotification } from '../../contexts/NotificationContext';
@@ -14,6 +14,7 @@ const AdminCourses: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const selectedBase = useMemo(() => courses.find(c => c.id === selectedId) || null, [courses, selectedId]);
 
@@ -133,6 +134,55 @@ const AdminCourses: React.FC = () => {
     } as any);
   };
 
+  // Export/Import JSON (localStorage only)
+  const exportJson = () => {
+    try {
+      const customCourses = JSON.parse(localStorage.getItem('customCourses') || '[]');
+      const deletedCourseIds = JSON.parse(localStorage.getItem('deletedCourseIds') || '[]');
+      const payload = {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        customCourses,
+        deletedCourseIds,
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'courses-export.json';
+      a.click();
+      URL.revokeObjectURL(url);
+      addNotification({ type: 'success', title: 'Export réussi', message: 'Les cours personnalisés ont été exportés en JSON.' } as any);
+    } catch (e) {
+      addNotification({ type: 'error', title: 'Export échoué', message: 'Impossible d\'exporter les cours.' } as any);
+    }
+  };
+
+  const triggerImport = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImportFile = async (file: File) => {
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      const customCourses = Array.isArray(data?.customCourses) ? data.customCourses : null;
+      const deletedCourseIds = Array.isArray(data?.deletedCourseIds) ? data.deletedCourseIds : null;
+      if (!customCourses) {
+        throw new Error('customCourses manquant ou invalide');
+      }
+      // deletedCourseIds est optionnel
+      localStorage.setItem('customCourses', JSON.stringify(customCourses));
+      if (deletedCourseIds) localStorage.setItem('deletedCourseIds', JSON.stringify(deletedCourseIds));
+      await reload();
+      addNotification({ type: 'success', title: 'Import réussi', message: 'Les cours ont été importés depuis le JSON.' } as any);
+    } catch (e) {
+      addNotification({ type: 'error', title: 'Import échoué', message: 'Le fichier JSON est invalide ou corrompu.' } as any);
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -140,7 +190,31 @@ const AdminCourses: React.FC = () => {
           <h2 className="text-xl font-semibold">Gestion des cours</h2>
           <p className="text-sm text-gray-500">Créer, modifier ou supprimer des cours (métadonnées, modules, leçons, quiz).</p>
         </div>
-        <button onClick={onAdd} className="px-3 py-2 rounded text-white text-sm bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 active:scale-95 transition duration-200">+ Nouveau cours</button>
+        <div className="flex items-center gap-2">
+          <button onClick={onAdd} className="px-3 py-2 rounded text-white text-sm bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 active:scale-95 transition duration-200">+ Nouveau cours</button>
+          <button
+            type="button"
+            onClick={exportJson}
+            className="px-3 py-2 rounded border text-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 active:scale-95 transition"
+            title="Exporter les cours personnalisés (JSON)"
+          >Exporter</button>
+          <button
+            type="button"
+            onClick={triggerImport}
+            className="px-3 py-2 rounded border text-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 active:scale-95 transition"
+            title="Importer des cours depuis un fichier JSON"
+          >Importer</button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/json,.json"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) handleImportFile(f);
+            }}
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
