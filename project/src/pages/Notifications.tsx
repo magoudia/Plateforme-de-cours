@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { supabase, hasSupabase } from '../lib/supabaseClient';
 
 interface Notification {
   id: string;
@@ -48,57 +47,11 @@ const Notifications: React.FC = () => {
   useEffect(() => {
     if (!user) navigate('/login');
 
-    let supaSubBroadcast: { unsubscribe: () => void } | null = null;
-    let supaSubTargeted: { unsubscribe: () => void } | null = null;
+    // No Supabase subscriptions; rely on window events only
 
     const load = async () => {
       let targeted: Notification[] = userKey ? readJSON(userKey) : [];
-      let broadcasts: Notification[] = [];
-
-      if (hasSupabase && supabase) {
-        const { data, error } = await supabase
-          .from('notifications')
-          .select('*')
-          .order('created_at', { ascending: false });
-        if (!error && Array.isArray(data)) {
-          broadcasts = data.map((row: any) => ({
-            id: row.id?.toString?.() || row.id,
-            type: row.type,
-            title: row.title,
-            message: row.message,
-            date: row.created_at,
-            read: false,
-            _table: 'notifications',
-            _sid: row.id,
-            _targeted: false,
-          }));
-        } else {
-          broadcasts = readJSON('notifications');
-        }
-        // Load targeted from Supabase as well
-        if (userId) {
-          const { data: tdata, error: terror } = await supabase
-            .from('user_notifications')
-            .select('*')
-            .eq('recipient_id', userId)
-            .order('created_at', { ascending: false });
-          if (!terror && Array.isArray(tdata)) {
-            targeted = tdata.map((row: any) => ({
-              id: row.id?.toString?.() || row.id,
-              type: row.type,
-              title: row.title,
-              message: row.message,
-              date: row.created_at,
-              read: !!row.read,
-              _table: 'user_notifications',
-              _sid: row.id,
-              _targeted: true,
-            }));
-          }
-        }
-      } else {
-        broadcasts = readJSON('notifications');
-      }
+      const broadcasts: Notification[] = readJSON('notifications');
 
       setNotifs([...(targeted || []), ...(broadcasts || [])]);
     };
@@ -109,47 +62,17 @@ const Notifications: React.FC = () => {
     window.addEventListener('notifications:updated', onUpd);
     if (userKey) window.addEventListener(`notifications:updated:${userKey.split(':')[1]}`, onUpd);
 
-    if (hasSupabase && supabase) {
-      supaSubBroadcast = supabase
-        .channel('public:notifications-inserts')
-        .on(
-          'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'notifications' },
-          () => onUpd()
-        )
-        .subscribe();
-      if (userId) {
-        supaSubTargeted = supabase
-          .channel('public:user_notifications-inserts')
-          .on(
-            'postgres_changes',
-            { event: 'INSERT', schema: 'public', table: 'user_notifications', filter: `recipient_id=eq.${userId}` },
-            () => onUpd()
-          )
-          .subscribe();
-      }
-    }
+    // No Supabase realtime; events above handle UI updates
 
     return () => {
       window.removeEventListener('notifications:updated', onUpd);
       if (userKey) window.removeEventListener(`notifications:updated:${userKey.split(':')[1]}`, onUpd);
-      if (supaSubBroadcast) supaSubBroadcast.unsubscribe();
-      if (supaSubTargeted) supaSubTargeted.unsubscribe();
+      // nothing to unsubscribe beyond window events
     };
   }, [user, navigate, userKey, userId]);
 
   const markAsRead = async (id: string) => {
     const item = notifications.find(n => n.id === id);
-    if (item && hasSupabase && supabase && item._table === 'user_notifications' && item._sid) {
-      const { error } = await supabase
-        .from('user_notifications')
-        .update({ read: true })
-        .eq('id', item._sid);
-      if (!error) {
-        setNotifs(notifications.map(n => n.id === id ? { ...n, read: true } : n));
-        return;
-      }
-    }
     // try targeted first
     if (userKey) {
       const targeted: Notification[] = readJSON(userKey);
@@ -169,16 +92,6 @@ const Notifications: React.FC = () => {
 
   const deleteNotif = async (id: string) => {
     const item = notifications.find(n => n.id === id);
-    if (item && hasSupabase && supabase && item._table === 'user_notifications' && item._sid) {
-      const { error } = await supabase
-        .from('user_notifications')
-        .delete()
-        .eq('id', item._sid);
-      if (!error) {
-        setNotifs(notifications.filter(n => n.id !== id));
-        return;
-      }
-    }
     if (userKey) {
       const targeted: Notification[] = readJSON(userKey);
       if (Array.isArray(targeted) && targeted.some(n => n.id === id)) {

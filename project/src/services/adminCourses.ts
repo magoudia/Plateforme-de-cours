@@ -1,6 +1,5 @@
 import { Course } from '../types';
 import { mockCourses } from '../data/mockData';
-import { supabase, hasSupabase } from '../lib/supabaseClient';
 
 const STORAGE_KEY = 'customCourses';
 const STORAGE_DELETED_KEY = 'deletedCourseIds';
@@ -56,54 +55,32 @@ export function getAllCourses(): Course[] {
 // --- Supabase helpers (async) ---
 
 export async function getAllCoursesAsync(): Promise<Course[]> {
-  try {
-    if (hasSupabase && supabase) {
-      const { data, error } = await supabase
-        .from('courses')
-        .select('*')
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      const dbCourses = Array.isArray(data) ? (data as unknown as Course[]) : [];
-      // Merge mock base with DB and also include local custom overrides to avoid UI flicker
-      const custom = readStore();
-      const deleted = new Set(readDeleted());
-      return mergeCourses(mergeCourses(mockCourses, dbCourses), custom).filter(c => !deleted.has(c.id));
-    }
-  } catch (e) {
-    console.warn('Supabase getAllCoursesAsync failed, fallback to local:', e);
-  }
-  return getAllCourses();
+  // Pure local: merge base + custom and filter deleted
+  return Promise.resolve(getAllCourses());
 }
 
 export async function saveCourseAsync(course: Course): Promise<void> {
-  // Always keep local fallback updated for offline/dev
-  saveCourse(course);
-  if (hasSupabase && supabase) {
-    try {
-      const { error } = await supabase
-        .from('courses')
-        .upsert(course, { onConflict: 'id' });
-      if (error) throw error;
-    } catch (e) {
-      console.warn('Supabase saveCourseAsync failed, kept local copy:', e);
-    }
-  }
+  // Normalize and save locally only
+  const totalModules = Array.isArray(course.modules) ? course.modules.length : (course.totalModules || 0);
+  const flatLessons = Array.isArray(course.modules) ? (course.modules || []).flatMap(m => m.lessons || []) : (course.lessons || []);
+  const totalLessons = flatLessons.length;
+  const normalized: Course = {
+    ...course,
+    duration: course.duration || '0min',
+    studentsCount: typeof course.studentsCount === 'number' ? course.studentsCount : 0,
+    rating: typeof course.rating === 'number' ? course.rating : 0,
+    price: typeof course.price === 'number' && course.price > 0 ? course.price : 60000,
+    imageUrl: course.imageUrl || 'https://placehold.co/400x250?text=Cours',
+    totalModules,
+    totalLessons,
+    lessons: flatLessons,
+  };
+  saveCourse(normalized);
 }
 
 export async function deleteCourseAsync(courseId: string): Promise<void> {
-  // Keep local tombstone behavior
+  // Local delete only
   deleteCourse(courseId);
-  if (hasSupabase && supabase) {
-    try {
-      const { error } = await supabase
-        .from('courses')
-        .delete()
-        .eq('id', courseId);
-      if (error) throw error;
-    } catch (e) {
-      console.warn('Supabase deleteCourseAsync failed, local tombstone remains:', e);
-    }
-  }
 }
 
 export function saveCourse(course: Course): void {

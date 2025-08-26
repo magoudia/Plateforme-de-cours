@@ -17,15 +17,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(JSON.parse(savedUser));
       return;
     }
-    // Support dedicated admin session that does not mark the platform user as connected
-    const adminSession = localStorage.getItem('adminSession');
-    if (adminSession) {
-      try {
-        const users = JSON.parse(localStorage.getItem('users') || '[]');
-        const admin = users.find((u: any) => u?.isAdmin);
-        if (admin) setUser(admin);
-      } catch {}
-    }
+    // Removed automatic admin session restore to prevent unintended auto-login
   }, []);
 
   // Heartbeat for "connected users" (client-side only)
@@ -58,9 +50,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const existingUser = users.find((u: User) => u.email === email);
     
     if (existingUser) {
-      // Ensure admin flag stays in sync with adminEmails list if present
+      // Admin strict: only emails listed in adminEmails are admins
       const adminEmails: string[] = JSON.parse(localStorage.getItem('adminEmails') || '[]');
-      const updatedUser: User = { ...existingUser, isAdmin: !!(existingUser.isAdmin || adminEmails.includes(existingUser.email)) };
+      const updatedUser: User = { ...existingUser, isAdmin: adminEmails.includes(existingUser.email) };
       setUser(updatedUser);
       if (updatedUser.isAdmin) {
         // Do NOT mark as platform user; persist a dedicated admin session only
@@ -88,14 +80,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
     
     const adminEmails: string[] = JSON.parse(localStorage.getItem('adminEmails') || '[]');
-    const noAdminsYet = !users.some((u: User) => u.isAdmin === true);
     const newUser: User = {
       id: Date.now().toString(),
       email,
       name,
       enrolledCourses: [],
-      // First user becomes admin, or if email is listed in adminEmails
-      isAdmin: noAdminsYet || adminEmails.includes(email)
+      // Admin strict: only emails listed in adminEmails are admins
+      isAdmin: adminEmails.includes(email)
     };
     
     users.push(newUser);
@@ -106,13 +97,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const logout = () => {
-    const wasAdmin = !!user?.isAdmin;
     setUser(null);
-    if (wasAdmin) {
-      localStorage.removeItem('adminSession');
-    } else {
-      localStorage.removeItem('currentUser');
-    }
+    // Clear any persisted session keys to avoid sticky auto-login
+    localStorage.removeItem('adminSession');
+    localStorage.removeItem('currentUser');
     if (heartbeatRef.current) {
       window.clearInterval(heartbeatRef.current);
       heartbeatRef.current = null;
