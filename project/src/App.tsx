@@ -18,6 +18,7 @@ import QuizPythonInteractif from './pages/QuizPythonInteractif';
 import RequireLessonCompleted from './components/Common/RequireLessonCompleted';
 import AdminConsole from './pages/admin/AdminConsole';
 
+
 function App() {
   return (
     <NotificationProvider>
@@ -83,6 +84,9 @@ const AppContent: React.FC = () => {
                 />
                 {/* Single-page Admin Console */}
                 <Route path="/admin" element={<AdminConsole />} />
+                
+                {/* Route de test pour Supabase */}
+                
               </Routes>
             </main>
       {!isAdminRoute && <Footer />}
