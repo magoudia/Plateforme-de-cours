@@ -23,23 +23,39 @@ export interface Module {
   progress?: number; // 0-100
 }
 
+export interface MediaFile {
+  id: string;
+  url: string;
+  type: 'video' | 'pdf' | 'document' | 'image';
+  name: string;
+  size: number;
+  duration?: number; // en secondes, pour les vidéos
+  thumbnailUrl?: string; // pour les vidéos
+}
+
 export interface Lesson {
   id: string;
   title: string;
   description?: string;
   duration: string;
-  type: 'video' | 'text' | 'quiz' | 'document' | 'exercise';
-  content?: string; // URL de la vidéo (legacy) ou contenu texte
-  // Nouveau: support de plusieurs providers vidéo
+  type: 'video' | 'text' | 'quiz' | 'document' | 'exercise' | 'mixed';
+  content?: string;
+  // Support pour plusieurs médias
+  mediaFiles: MediaFile[];
+  // Anciens champs pour rétrocompatibilité
   videoProvider?: 'file' | 'vimeo';
-  videoUrl?: string; // URL directe vers le fichier vidéo (mp4) si provider = 'file'
-  vimeoId?: string;  // Identifiant Vimeo si provider = 'vimeo'
-  // Optionnel: plusieurs segments vidéo par leçon, chacun avec son texte au-dessus
+  videoUrl?: string;
+  vimeoId?: string;
   videoSections?: VideoSection[];
+  // État
   isCompleted?: boolean;
-  isLocked?: boolean; // Pour les leçons qui nécessitent de compléter les précédentes
+  isLocked?: boolean;
+  // Ressources additionnelles
   resources?: Resource[];
   quiz?: Quiz;
+  // Paramètres
+  allowDownload: boolean;
+  showInPreview: boolean;
 }
 
 export interface VideoSection {
@@ -75,10 +91,30 @@ export interface Question {
   explanation?: string;
 }
 
+export interface CourseSettings {
+  passingScore: number;
+  quizRequired: boolean;
+  finalProjectRequired: boolean;
+  accentColor: string;
+  status: 'draft' | 'published' | 'archived';
+  publishDate?: string;
+  accessLevel: 'all' | 'premium' | 'invite_only';
+}
+
+export interface RecommendedResource {
+  id: string;
+  title: string;
+  type: 'book' | 'tool' | 'link' | 'document';
+  url?: string;
+  author?: string;
+  description?: string;
+}
+
 export interface Course {
   id: string;
   title: string;
   description: string;
+  detailedDescription?: string;
   duration: string;
   level: 'Débutant' | 'Intermédiaire' | 'Avancé';
   category: string;
@@ -89,10 +125,14 @@ export interface Course {
   lessons: Lesson[];
   modules: Module[];
   isPremium: boolean;
-  modulesSchedule?: ModuleSchedule[];
+  modulesSchedule: ModuleSchedule[];
   totalModules: number;
   totalLessons: number;
-  certificate?: boolean;
+  certificate: boolean;
+  settings: CourseSettings;
+  recommendedResources: RecommendedResource[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface UserProgress {
