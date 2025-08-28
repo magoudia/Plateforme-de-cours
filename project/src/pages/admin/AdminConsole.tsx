@@ -118,7 +118,6 @@ const AdminConsole: React.FC = () => {
               </div>
               <button type="submit" className="w-full py-2.5 rounded-lg text-white shadow-sm bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 active:scale-95 transition duration-200">Se connecter</button>
             </form>
-            <p className="text-xs text-gray-500 mt-4">Identifiants: IAI_Admin / IAI@admin</p>
           </div>
         </div>
       </div>
