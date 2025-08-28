@@ -5,6 +5,7 @@ import { Lesson, Course, VideoSection } from '../../types';
 import { useProgress } from '../../contexts/ProgressContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import { courseContent } from '../../data/courseContent';
+import { extractVimeoId, getVimeoEmbedUrl } from '../../utils/vimeo';
 
 interface LessonViewerProps {
   lesson: Lesson;
@@ -65,16 +66,39 @@ const VideoSectionPlayer: React.FC<{ section: VideoSection; fallbackLesson: Less
   };
 
   // Determine effective provider/ids with fallback to lesson-level fields for backward compatibility
-  const effectiveProvider = section.videoProvider || fallbackLesson.videoProvider;
-  const vimeoId = section.vimeoId || extractVimeoId(section.videoUrl || '') || fallbackLesson.vimeoId || extractVimeoId(fallbackLesson.videoUrl || fallbackLesson.content || '') || '';
-  const treatAsVimeo = (effectiveProvider === 'vimeo' && !!vimeoId) || (!effectiveProvider && !!vimeoId);
+  const effectiveProvider = section.videoProvider || fallbackLesson.videoProvider || 'vimeo';
+  
+  // Extraire l'ID Vimeo en priorité depuis la section, puis depuis la leçon
+  const vimeoId = section.vimeoId || 
+                 extractVimeoId(section.videoUrl || '') || 
+                 fallbackLesson.vimeoId || 
+                 extractVimeoId(fallbackLesson.videoUrl || '') ||
+                 extractVimeoId(fallbackLesson.content || '') || '';
+  // Traiter comme Vimeo si l'ID est valide, quelle que soit la valeur de effectiveProvider
+  const treatAsVimeo = !!vimeoId;
   const fileSrc = !treatAsVimeo ? (section.videoUrl || fallbackLesson.videoUrl || fallbackLesson.content) : undefined;
-  const vimeoSrc = treatAsVimeo && vimeoId ? `https://player.vimeo.com/video/${vimeoId}?title=0&byline=0&portrait=0` : undefined;
+  const vimeoSrc = treatAsVimeo && vimeoId ? 
+    getVimeoEmbedUrl(vimeoId, {
+      autoplay: false,
+      title: false,
+      byline: false,
+      portrait: false,
+      muted: false
+    }) : undefined;
+
+  // État pour gérer les erreurs de chargement
+  const [vimeoError, setVimeoError] = useState(false);
 
   useEffect(() => {
     let player: any = null;
     let cleanup: (() => void) | null = null;
+    
     if (treatAsVimeo && iframeRef.current) {
+      setVimeoError(false); // Réinitialiser l'état d'erreur
+      
+      // Ajouter un écouteur d'erreur sur l'iframe
+      const handleIframeError = () => setVimeoError(true);
+      iframeRef.current.addEventListener('error', handleIframeError);
       const ensureScript = () => new Promise<void>((resolve) => {
         if ((window as any).Vimeo && (window as any).Vimeo.Player) return resolve();
         const existing = document.querySelector('script[src="https://player.vimeo.com/api/player.js"]') as HTMLScriptElement | null;
@@ -92,7 +116,12 @@ const VideoSectionPlayer: React.FC<{ section: VideoSection; fallbackLesson: Less
         cleanup = () => { try { player && player.unload && player.unload(); } catch {} };
       });
     }
-    return () => { if (cleanup) cleanup(); };
+    return () => { 
+      if (cleanup) cleanup(); 
+      if (iframeRef.current) {
+        iframeRef.current.removeEventListener('error', handleIframeError);
+      }
+    };
   }, [treatAsVimeo, vimeoId, onVideoEnd]);
 
   return (
@@ -491,24 +520,32 @@ const VideoSectionPlayer: React.FC<{ section: VideoSection; fallbackLesson: Less
 const VideoContent: React.FC<{ lesson: Lesson; onVideoEnd: () => void }> = ({ lesson, onVideoEnd }) => {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
-
-  // Helper: extract Vimeo ID from a URL or raw ID
-  const extractVimeoId = (input: string): string | null => {
-    if (!input) return null;
-    const trimmed = input.trim();
-    if (/^\d{6,}$/.test(trimmed)) return trimmed;
-    const m = trimmed.match(/vimeo\.com\/(?:video\/)?(\d+)/i);
-    return m && m[1] ? m[1] : null;
-  };
+  const { addNotification } = useNotification();
+  const [, setVimeoError] = useState(false);
 
   useEffect(() => {
     // If Vimeo provider, load API and attach listeners
     const inferredVimeoId = lesson.vimeoId || extractVimeoId(lesson.videoUrl || lesson.content || '') || '';
     const isVimeo = (lesson.videoProvider === 'vimeo' && !!inferredVimeoId) || (!lesson.videoProvider && !!inferredVimeoId);
+    
+    setVimeoError(false); // Réinitialiser l'état d'erreur interne
     let player: any = null;
     let cleanup: (() => void) | null = null;
 
+    const handleIframeError = () => {
+      setVimeoError(true);
+      addNotification({
+        type: 'error',
+        title: 'Erreur de chargement',
+        message: 'Impossible de charger la vidéo Vimeo. Veuillez réessayer plus tard.'
+      });
+    };
+
     if (isVimeo && iframeRef.current) {
+      if (iframeRef.current) {
+        iframeRef.current.addEventListener('error', handleIframeError);
+      }
+      
       const ensureScript = () => new Promise<void>((resolve) => {
         if ((window as any).Vimeo && (window as any).Vimeo.Player) return resolve();
         const existing = document.querySelector('script[src="https://player.vimeo.com/api/player.js"]') as HTMLScriptElement | null;
@@ -533,16 +570,28 @@ const VideoContent: React.FC<{ lesson: Lesson; onVideoEnd: () => void }> = ({ le
       });
     }
 
+    // Créer une copie de la référence pour la fonction de nettoyage
+    const currentIframe = iframeRef.current;
+    
     return () => {
       if (cleanup) cleanup();
+      if (currentIframe) {
+        currentIframe.removeEventListener('error', handleIframeError);
+      }
     };
   }, [lesson.videoProvider, lesson.vimeoId, lesson.videoUrl, lesson.content, onVideoEnd]);
 
   const inferredVimeoId = lesson.vimeoId || extractVimeoId(lesson.videoUrl || lesson.content || '') || '';
   const treatAsVimeo = (lesson.videoProvider === 'vimeo' && !!inferredVimeoId) || (!lesson.videoProvider && !!inferredVimeoId);
   const fileSrc = !treatAsVimeo ? (lesson.videoUrl || lesson.content) : undefined;
-  const vimeoSrc = treatAsVimeo && inferredVimeoId
-    ? `https://player.vimeo.com/video/${inferredVimeoId}?title=0&byline=0&portrait=0`
+  const vimeoSrc = treatAsVimeo && inferredVimeoId 
+    ? getVimeoEmbedUrl(inferredVimeoId, {
+        autoplay: false,
+        title: false,
+        byline: false,
+        portrait: false,
+        muted: false
+      })
     : undefined;
 
   return (
